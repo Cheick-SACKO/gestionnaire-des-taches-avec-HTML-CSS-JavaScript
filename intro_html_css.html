@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestionnaire de Tâches</title>
+  <style>
+    /* Styles de la page */
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #3a7bd5, #00d2ff);
+    }
+    /* Conteneur principal */
+    .todo-container {
+      background: #dceeff;
+      border-radius: 20px;
+      padding: 20px;
+      width: 100%;
+      max-width: 800px;
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+      position: relative;
+    }
+    /* Titre */
+    .todo-header {
+      text-align: center;
+      color: #fff;
+      font-size: 24px;
+      margin-bottom: 20px;
+      font-weight: bold;
+    }
+    /* Groupe de boutons */
+    .button-group {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    /* Styles des boutons */
+    .button {
+      background-color: #e5e5e5;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: bold;
+      color: #333;
+    }
+    .button.active {
+      background-color: #3a7bd5;
+      color: #fff;
+    }
+    /* Styles de la table */
+    .todo-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #f0f8ff;
+      border-radius: 15px;
+      overflow: hidden;
+    }
+    .todo-table th, .todo-table td {
+      padding: 15px;
+      text-align: left;
+    }
+    .todo-table th {
+      background-color: #d0e7ff;
+      font-weight: bold;
+    }
+    .todo-table tr:nth-child(even) {
+      background-color: #f9f9f9;
+    }
+    /* Icônes de modification et de suppression */
+    .icon {
+      cursor: pointer;
+      padding: 5px;
+      border-radius: 5px;
+      transition: background-color 0.3s;
+    }
+    .actions {
+    display: flex;
+    gap: 10px; /* Espacement entre les icônes */
+    align-items: center;
+    }
+
+    .icon:hover {
+      background-color: #ddd; /* Couleur de fond au survol */
+    }
+    /* Modal styling */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-content {
+      background: #fff;
+      padding: 20px;
+      border-radius: 15px;
+      width: 80%;
+      max-width: 500px;
+    }
+    .modal-header {
+      font-size: 20px;
+      margin-bottom: 10px;
+      font-weight: bold;
+    }
+    .modal-input {
+      width: 100%;
+      padding: 10px;
+      margin: 5px 0;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+    }
+    .modal-footer {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 20px;
+    }
+    .save-button {
+      background-color: #3a7bd5;
+      color: #fff;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .cancel-button {
+      background-color: #e5e5e5;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<div class="todo-container">
+  <div class="todo-header">Gestionnaire de Tâches</div>
+  <div class="button-group">
+    <button class="button" onclick="openModal(); setActiveButton(this)">Ajouter une nouvelle tâche</button>
+    <button class="button active" onclick="fetchTasks(); setActiveButton(this)">Liste des tâches</button>
+    <button class="button" onclick="filterTasks('todo'); setActiveButton(this)">A faire</button>
+    <button class="button" onclick="filterTasks('completed'); setActiveButton(this)">Déjà fait</button>
+  </div>
+
+  <table class="todo-table">
+    <thead>
+      <tr>
+        <th>Tâche</th>
+        <th>Description</th>
+        <th>Catégorie</th>
+        <th>Date</th>
+        <th>Priorité</th>
+        <th>État</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="taskTableBody">
+      <!-- Les tâches seront injectées ici par JavaScript -->
+    </tbody>
+  </table>
+</div>
+
+<!-- Modal pour ajouter une nouvelle tâche -->
+<div id="todoModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">Ajouter une tâche:</div>
+    <input type="text" class="modal-input" placeholder="Nom">
+    <input type="text" class="modal-input" placeholder="Description">
+    <input type="text" class="modal-input" placeholder="Catégorie">
+    <input type="date" class="modal-input" placeholder="Date">
+    <input type="time" class="modal-input" placeholder="Heure">
+    <select class="modal-input" placeholder="Priorité">
+      <option>Priorité</option>
+      <option>Élevé</option>
+      <option>Moyen</option>
+      <option>Faible</option>
+    </select>
+    <input type="range" min="0" max="100" class="modal-input" placeholder="État">
+
+    <div class="modal-footer">
+      <button class="save-button" onclick="saveTodo()">Enregistrer</button>
+      <button class="cancel-button" onclick="closeModal()">Quitter</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const apiUrl = 'http://localhost:8090/taches';
+
+  // Fonction pour mettre en surbrillance le bouton actif
+  function setActiveButton(button) {
+    document.querySelectorAll('.button').forEach(btn => btn.classList.remove('active'));
+    button.classList.add('active');
+  }
+
+  // Fonction pour obtenir les tâches depuis le serveur et les afficher
+  async function fetchTasks() {
+    const response = await fetch(apiUrl);
+    const taches = await response.json();
+    displayTasks(taches);
+  }
+
+  // Fonction pour afficher les tâches dans le tableau
+  function displayTasks(taches) {
+    const tableBody = document.getElementById("taskTableBody");
+    tableBody.innerHTML = "";
+    
+    taches.forEach(tache => {
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td>${tache.tache}</td>
+        <td>${tache.description}</td>
+        <td>${tache.categorie}</td>
+        <td>${new Date(tache.date).toLocaleString()}</td>
+        <td>${tache.priorite}</td>
+        <td>${tache.etat}%</td>
+        <td class="actions">
+          <span class="icon" onclick="editTask(${tache.id})">&#9998;</span>
+          <span class="icon" onclick="deleteTask(${tache.id})">&#10060;</span>
+        </td>
+      `;
+      tableBody.appendChild(row);
+    });
+  }
+
+  // Fonction pour ouvrir la modale
+  function openModal() {
+    document.getElementById('todoModal').style.display = 'flex';
+  }
+
+  // Fonction pour fermer la modale
+  function closeModal() {
+    document.getElementById('todoModal').style.display = 'none';
+  }
+
+  // Fonction pour ajouter une nouvelle tâche
+  async function saveTodo() {
+  const response = await fetch(apiUrl);
+  const tasks = await response.json();
+  const maxId = tasks.reduce((max, task) => Math.max(max, Number(task.id) || 0), 0);
+  
+  const newTache = {
+    tache: document.querySelector('.modal-input[placeholder="Nom"]').value,
+    description: document.querySelector('.modal-input[placeholder="Description"]').value,
+    categorie: document.querySelector('.modal-input[placeholder="Catégorie"]').value,
+    date: `${document.querySelector('.modal-input[type="date"]').value}T${document.querySelector('.modal-input[type="time"]').value}`,
+    priorite: document.querySelector('.modal-input[placeholder="Priorité"]').value,
+    etat: document.querySelector('.modal-input[type="range"]').value,
+    id: (maxId + 1).toString(),  // Attribue un ID numérique incrémental convertit en String 
+  };
+
+  await fetch(apiUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(newTache)
+  });
+
+  closeModal();
+  fetchTasks();
+}
+
+
+  // Fonction pour supprimer une tâche
+  async function deleteTask(id) {
+    await fetch(`${apiUrl}/${parseInt(id)}`, {
+      method: 'DELETE'
+    });
+    fetchTasks(); // Met à jour la liste des tâches
+  }
+
+  // Fonction pour filtrer les tâches selon leur état
+  async function filterTasks(filterType) {
+    const response = await fetch(apiUrl);
+    let taches = await response.json();
+
+    if (filterType === 'todo') {
+      // Filtre les tâches dont l'état est inférieur à 100
+      taches = taches.filter(tache => tache.etat < 100);
+    } else if (filterType === 'completed') {
+      // Filtre les tâches dont l'état est exactement 100
+      taches = taches.filter(tache => tache.etat == 100);
+    }
+
+    displayTasks(taches); // Affiche les tâches filtrées
+  }
+  
+
+  // Fonction pour modifier une tâche (ouvrir la modale en mode édition)
+  async function editTask(id) {
+    const response = await fetch(`${apiUrl}/${parseInt(id)}`);
+    const tache = await response.json();
+
+    // Remplit le formulaire de la modale avec les données de la tâche
+    document.querySelector('.modal-input[placeholder="Nom"]').value = tache.tache;
+    document.querySelector('.modal-input[placeholder="Description"]').value = tache.description;
+    document.querySelector('.modal-input[placeholder="Catégorie"]').value = tache.categorie;
+    document.querySelector('.modal-input[type="date"]').value = tache.date.split("T")[0];
+    document.querySelector('.modal-input[type="time"]').value = tache.date.split("T")[1];
+    document.querySelector('.modal-input[placeholder="Priorité"]').value = tache.priorite;
+    document.querySelector('.modal-input[type="range"]').value = tache.etat;
+
+    openModal();
+
+    // Change le bouton d'enregistrement pour mettre à jour la tâche
+    document.querySelector('.save-button').onclick = async function() {
+      const updatedTache = {
+        tache: document.querySelector('.modal-input[placeholder="Nom"]').value,
+        description: document.querySelector('.modal-input[placeholder="Description"]').value,
+        categorie: document.querySelector('.modal-input[placeholder="Catégorie"]').value,
+        date: `${document.querySelector('.modal-input[type="date"]').value}T${document.querySelector('.modal-input[type="time"]').value}`,
+        priorite: document.querySelector('.modal-input[placeholder="Priorité"]').value,
+        etat: document.querySelector('.modal-input[type="range"]').value
+      };
+
+      await fetch(`${apiUrl}/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedTache)
+      });
+
+      closeModal();
+      fetchTasks();
+    };
+  }
+
+  // Initialisation : charge les tâches au chargement de la page
+  document.addEventListener("DOMContentLoaded", fetchTasks);
+</script>
+
+</body>
+</html>
